@@ -128,3 +128,5 @@ MiningConfig.*.json
 log*.txt
 currentblock.txt
 unclaimed.json
+scripts/kubo
+scripts/kubo*_linux-amd64.tar.gz
