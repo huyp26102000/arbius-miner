@@ -1,11 +1,20 @@
 #!/bin/bash
 
-touch ~/.no_auto_tmux;
+# Download and install nvm using curl
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash &&
-source ~/.bashrc &&
-sleep 4
+# Ensure nvm is available in the current shell session
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Install the latest LTS version of Node.js
 nvm install --lts
+
+# Install Yarn globally
 npm install -g yarn
+
+# Install project dependencies using Yarn
 yarn
-npm i -g pm2
+
+# Install pm2 globally
+npm install -g pm2
