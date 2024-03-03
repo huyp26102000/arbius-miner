@@ -9,7 +9,11 @@ export async function sleep(ms: number): Promise<void> {
 export function now(): number {
   return Math.floor((+new Date)/1000);
 }
-
+export async function delay(timeout: number) {
+  return new Promise(resolve => {
+    setTimeout(resolve, timeout);
+  });
+}
 // torch.generator().manual_seed allows 2^64-1
 // but for easy interop with existing tooling we reduce this
 export function taskid2Seed(taskid: string): number {
