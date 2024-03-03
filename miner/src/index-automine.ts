@@ -639,6 +639,35 @@ async function processAutomine() {
 
     const receipt = await tx.wait();
     log.info(`Automine submitTask ${receipt.transactionHash}`);
+    const taskid = receipt?.logs?.[0]?.topics?.[1]
+    if(taskid) {
+      log.debug('Event.TaskSubmittedkkkkkkkkkk', taskid);
+      // log.debug(evt);
+    
+      if (alreadySeenTaskTx.has(receipt.transactionHash)) {
+        log.error("alreadySeenTaskTx", receipt.transactionHash);
+        log.error("taskid", taskid);
+        return;
+      } else {
+        alreadySeenTaskTx.add(receipt.transactionHash);
+      }
+    
+      const task = await lookupAndInsertTask(taskid);
+      const txid = receipt.transactionHash;
+    
+      const queued = await dbQueueJob({
+        method: 'task',
+        priority: 15,
+        waituntil: 0,
+        concurrent: true,
+        data: {
+          taskid,
+          txid,
+        },
+      });
+      console.log(queued);
+    }
+    
   } catch (e) {
     log.error(`Automine submitTask failed ${JSON.stringify(e)}`);
   }
@@ -699,17 +728,21 @@ async function processTask(
     log.debug(`Task (${taskid}) does not pass filter`);
     return;
   }
+ const {
+    validator: solutionValidator2,
+  } = await expretry(async () => await arbius.solutions(taskid));
+  if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
+    log.debug(`Task (${taskid}) already has solution`);
+    // TODO we may want to not do this right now for checking cid for solutions? maybe?
+    return; // TODO some % of the time we should attempt any way
+  }
+
 
   // this will be populated
   let input = await lookupAndInsertTaskInput(taskid, cid, txid, modelTemplate);
 
   log.debug(`Task (${taskid}) input ${JSON.stringify(input, null, 2)}`);
-  const { validator: solutionValidator2 } = await expretry(
-    async () => await arbius.solutions(taskid)
-  );
-  if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
-    return; // TODO some % of the time we should attempt any way
-  }
+
   await dbQueueJob({
     method: 'solve',
     priority: 20,
@@ -723,19 +756,6 @@ async function processTask(
 
 async function processSolve(taskid: string) {
   // TODO defer solution lookup for faster generation
-  const {
-    validator: solutionValidator,
-    blocktime: solutionBlocktime,
-    claimed: solutionClaimed,
-    cid: solutionCid
-  } = await expretry(async () => await arbius.solutions(taskid));
-  // const { owner } = await expretry(async () => await arbius.tasks(taskid));
-
-  if (solutionValidator != "0x0000000000000000000000000000000000000000") {
-    log.debug(`Task (${taskid}) already has solution`);
-    // TODO we may want to not do this right now for checking cid for solutions? maybe?
-    return; // TODO some % of the time we should attempt any way
-  }
 
   const lookup = await expretry(async () => await lookupAndInsertTask(taskid));
   if (!lookup) {
@@ -763,14 +783,18 @@ async function processSolve(taskid: string) {
     log.error(`Task (${taskid}) CID could not be generated`);
     return;
   }
-  // log.info(`CID ${cid} generated`);
-  const { validator: solutionValidator2 } = await expretry(
-    async () => await arbius.solutions(taskid)
-  );
+  log.info(`CID ${cid} generated`);
+
+  const commitment = generateCommitment(wallet.address, taskid, cid);
+ const {
+    validator: solutionValidator2,
+  } = await expretry(async () => await arbius.solutions(taskid));
   if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
+    log.debug(`Task (${taskid}) already has solution`);
+    // TODO we may want to not do this right now for checking cid for solutions? maybe?
     return; // TODO some % of the time we should attempt any way
   }
-  const commitment = generateCommitment(wallet.address, taskid, cid);
+
   try {
     const tx = await arbius.signalCommitment(commitment, {
       gasLimit: 450_000,
@@ -791,8 +815,9 @@ async function processSolve(taskid: string) {
         const tx = await solver.submitSolution(taskid, cid, {
           gasLimit: 500_000,
         });
-        const receipt = await tx.wait();
-        log.info(`Solution submitted in ${receipt.transactionHash}`);
+        // const receipt = await tx.wait();
+        // log.info(`Solution submitted in ${receipt.transactionHash}`);
+
         // await dbQueueJob({
         //   method: "claim",
         //   priority: 50,
@@ -827,6 +852,7 @@ async function processSolve(taskid: string) {
     3,
     1.25
   );
+  console.log(Date.now(), taskid, 'timeeeeeeeeeee2222222');
 }
 
 async function contestSolution(taskid: string) {
@@ -908,28 +934,24 @@ async function voteOnContestation(taskid: string, yea: boolean) {
 }
 
 async function processClaim(taskid: string) {
-  return;
+  return 
   const receipt = await expretry(async () => {
-    const { claimed } = await expretry(
-      async () => await arbius.solutions(taskid)
-    );
+    const { claimed } = await expretry(async () => await arbius.solutions(taskid));
     log.debug("processClaim [claimed]", claimed);
     if (claimed) {
       log.warn(`Solution (${taskid}) already claimed`);
       return null;
     }
 
-    const { validator: contestationValidator } = await expretry(
-      async () => await arbius.contestations(taskid)
-    );
+    const { validator: contestationValidator } = await expretry(async () => await arbius.contestations(taskid));
     log.debug("processClaim [contestationValidator]", contestationValidator);
     if (contestationValidator != "0x0000000000000000000000000000000000000000") {
       log.error(`Contestation found for solution ${taskid}, cannot claim`);
 
       await dbQueueJob({
-        method: "contestationVoteFinish",
+        method: 'contestationVoteFinish',
         priority: 200,
-        waituntil: now() + 5010,
+        waituntil: now()+5010,
         concurrent: false,
         data: {
           taskid,
@@ -942,7 +964,7 @@ async function processClaim(taskid: string) {
     const tx = await arbius.claimSolution(taskid, {
       gasLimit: 300_000,
     });
-    const receipt = await tx.wait();
+    const receipt = await tx.wait()
     log.info(`Claim ${taskid} in ${receipt.transactionHash}`);
     return receipt;
   });
@@ -1116,6 +1138,7 @@ export async function processJobs(jobs: DBJob[]) {
       case 'contestationVoteFinish':
        return () => processContestationVoteFinish(decoded.taskid);
        break;
+
       default:
         log.error(`Job (${job.id}) method (${job.method}) has no implementation`);
         process.exit(1);
@@ -1238,13 +1261,13 @@ export async function main() {
     await versionCheck();
   });
 
-  arbius.on('TaskSubmitted', (
-    taskid:  string,
-    modelid: string,
-    fee:     BigNumber,
-    sender:  string,
-    evt:     ethers.Event,
-  ) => eventHandlerTaskSubmitted(taskid, evt));
+  // arbius.on('TaskSubmitted', (
+  //   taskid:  string,
+  //   modelid: string,
+  //   fee:     BigNumber,
+  //   sender:  string,
+  //   evt:     ethers.Event,
+  // ) => eventHandlerTaskSubmitted(taskid, evt));
 
   arbius.on('TaskRetracted', (
     taskid:  string,

@@ -9,6 +9,7 @@
     "clean": "rimraf ./build",
     "build": "yarn clean && tsc && copyfiles -u 1 src/**/*.sql build/",
     "start": "node build/start.js",
+    "start-automine": "node build/start-automine.js",
     "scan:unclaimed": "npx ts-node ./scripts/cache_unclaimed_tasks.ts",
     "start:dev": "npx nodemon",
     "watch:solution": "npx nodemon --exec \"npx ts-node ./src/solutionwatch.ts\"",
