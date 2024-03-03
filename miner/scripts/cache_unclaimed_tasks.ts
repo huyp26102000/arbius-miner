@@ -89,6 +89,7 @@ async function processAutoClaim(configPath: string) {
 
   try {
     const mconf = JSON.parse(readFileSync(configPath, "utf8"));
+    mconf["blockchain"]["private_key"] = mconf?.blockchain?.private_key_claim
     console.log(mconf);
     coreAddress = mconf?.blockchain?.core_address;
     initializeMiningConfig(mconf);
@@ -96,7 +97,6 @@ async function processAutoClaim(configPath: string) {
     console.error(`unable to parse ${configPath}`);
     process.exit(1);
   }
-
   initializeLogger(null);
 
   await initializeBlockchain();
