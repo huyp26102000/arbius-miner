@@ -126,3 +126,5 @@ MiningConfig.*.json
 !MiningConfig.example.json
 
 log*.txt
+currentblock.txt
+unclaimed.json
