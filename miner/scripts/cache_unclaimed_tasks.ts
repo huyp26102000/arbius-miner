@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { initializeLogger, log } from "../src/log";
 import { initializeMiningConfig, c } from "../src/mc";
 import { initializeBlockchain, wallet, arbius } from "../src/blockchain";
-import { expretry, delay, sleep } from "../src/utils";
+import { expretryClaim, delay, sleep } from "../src/utils";
 
 const maxBlocks = 10_000;
 
@@ -126,7 +126,7 @@ async function processAutoClaim(configPath: string) {
     try {
       log.debug(`Attempting to claim ${taskid}`);
 
-      const tx = await expretry(
+      const tx = await expretryClaim(
         async () => await arbius.claimSolution(taskid),
         1
       );

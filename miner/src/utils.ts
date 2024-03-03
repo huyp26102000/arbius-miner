@@ -41,6 +41,22 @@ export async function expretry<T>(
 
   return null;
 }
+export async function expretryClaim<T>(
+  fn: () => Promise<T>,
+  tries: number = 10,
+  base: number = 1.5,
+): Promise<T|null> {
+  try {
+    return await fn();
+  } catch (e) {
+    // const seconds = base**retry;
+    // // log.warn(`retry request failed, retrying in ${seconds}`);
+    // // log.debug(JSON.stringify(e));
+    // error = JSON.stringify(e)
+    // await sleep(200 * seconds);
+    throw e;
+  }
+}
 
 // expects hex values
 export function generateCommitment(address: string, taskid: string, cid: string): string {
