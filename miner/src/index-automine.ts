@@ -672,16 +672,14 @@ async function processAutomine() {
     log.error(`Automine submitTask failed ${JSON.stringify(e)}`);
   }
 
-  if (c.automine.enabled) {
-    await dbQueueJob({
-      method: 'automine',
-      priority: 5,
-      waituntil: now()+c.automine.delay,
-      concurrent: false,
-      data: {
-      },
-    });
-  }
+  await dbQueueJob({
+    method: 'automine',
+    priority: 5,
+    waituntil: now()+c.automine.delay,
+    concurrent: false,
+    data: {
+    },
+  });
 }
 
 // can be run concurrently as its just downloading
@@ -1242,16 +1240,14 @@ export async function main() {
     data: {},
   });
 
-  if (c.automine.enabled) {
-    await dbQueueJob({
-      method: 'automine',
-      priority: 5,
-      waituntil: 0,
-      concurrent: false,
-      data: {
-      },
-    });
-  }
+  await dbQueueJob({
+    method: 'automine',
+    priority: 5,
+    waituntil: 0,
+    concurrent: false,
+    data: {
+    },
+  });
 
   arbius.on('VersionChanged', async(
     version: ethers.BigNumber,

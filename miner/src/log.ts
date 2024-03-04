@@ -21,7 +21,7 @@ export function initializeLogger(log_path: string|null) {
       }
 
       const l = `${lobj._meta.date.getTime()} ${lobj._meta.logLevelName} ${p} ${m.join('\t')}\n`;
-      fs.appendFileSync(log_path, l);
+      // fs.appendFileSync(log_path, l);
     });
   }
 }

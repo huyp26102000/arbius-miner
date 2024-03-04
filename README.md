@@ -22,5 +22,6 @@ touch ~/.no_auto_tmux;
 ```
 pm2 start build/start-automine.js -- MiningConfig.json
 pm2 start build/start.js -- MiningConfig.json
+pm2 start yarn --name "claim" -- scan:unclaimed
 ```
 <b>Claiming</b>
