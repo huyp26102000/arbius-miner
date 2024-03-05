@@ -66,8 +66,6 @@ const getLogs = async (
   return unclaimedTasks;
 };
 async function processAutoClaim(configPath: string) {
-  const currentBlock: any = +(await wallet.provider.getBlockNumber());
-  let lastScanBlock = +currentBlock - 1000000;
   let coreAddress;
   const unclaimedPath = "unclaimed.json";
   let taskids: any = [];
@@ -93,6 +91,7 @@ async function processAutoClaim(configPath: string) {
     console.error(`unable to parse ${configPath}`);
     process.exit(1);
   }
+  
   initializeLogger(null);
 
   await initializeBlockchain();
@@ -100,7 +99,8 @@ async function processAutoClaim(configPath: string) {
     console.log(`No core_address in ${configPath}`);
     return;
   }
-
+  const currentBlock: any = +(await wallet.provider.getBlockNumber());
+  let lastScanBlock = +currentBlock - 2000000;
   console.log("Current block", currentBlock);
   const unclaimedTasks = await getLogs(
     coreAddress,
@@ -146,6 +146,6 @@ async function processAutoClaim(configPath: string) {
 (async () => {
   while (true) {
     await processAutoClaim("MiningConfig.json");
-    await delay(1000);
+    await delay(300000);
   }
 })();
