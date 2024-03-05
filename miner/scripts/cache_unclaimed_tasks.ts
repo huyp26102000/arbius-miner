@@ -66,14 +66,10 @@ const getLogs = async (
   return unclaimedTasks;
 };
 async function processAutoClaim(configPath: string) {
-  let lastScanBlock;
+  const currentBlock: any = +(await wallet.provider.getBlockNumber());
+  let lastScanBlock = +currentBlock - 1000000;
   let coreAddress;
   const unclaimedPath = "unclaimed.json";
-  try {
-    lastScanBlock = await readFileSync("currentblock.txt", "utf8");
-  } catch (error) {
-    console.log("No currentblock.txt found!");
-  }
   let taskids: any = [];
   try {
     if (existsSync(unclaimedPath)) {
@@ -89,7 +85,7 @@ async function processAutoClaim(configPath: string) {
 
   try {
     const mconf = JSON.parse(readFileSync(configPath, "utf8"));
-    mconf["blockchain"]["private_key"] = mconf?.blockchain?.private_key_claim
+    mconf["blockchain"]["private_key"] = mconf?.blockchain?.private_key_claim;
     console.log(mconf);
     coreAddress = mconf?.blockchain?.core_address;
     initializeMiningConfig(mconf);
@@ -104,9 +100,8 @@ async function processAutoClaim(configPath: string) {
     console.log(`No core_address in ${configPath}`);
     return;
   }
-  const currentBlock: any = +(await wallet.provider.getBlockNumber()) - 1;
+
   console.log("Current block", currentBlock);
-  await writeFileSync("currentblock.txt", currentBlock.toString());
   const unclaimedTasks = await getLogs(
     coreAddress,
     Number(lastScanBlock),
