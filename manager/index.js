@@ -45,7 +45,7 @@ app.get("/claim", (req, res) => {
           console.error(err);
           process.exit(2);
         }
-        pm2.restart("start", (restartErr) => {
+        pm2.restart("claim", (restartErr) => {
           if (restartErr) {
             console.error(restartErr);
             res.send(restartErr);
@@ -59,7 +59,7 @@ app.get("/claim", (req, res) => {
     }
   } else {
     try {
-      pm2.stop("start");
+      pm2.stop("claim");
       res.send("Successfully stop service");
     } catch (error) {
       res.send(restartErr, 404);
