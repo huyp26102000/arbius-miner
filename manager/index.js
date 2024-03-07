@@ -36,33 +36,144 @@ app.get("/pm2/jobs", (req, res) => {
     });
   });
 });
-app.get("/claim", (req, res) => {
-  const newStatus = req?.query?.status == "true";
-  if (newStatus) {
-    try {
-      pm2.connect((err) => {
-        if (err) {
-          console.error(err);
-          process.exit(2);
+const acceptAction = ["claim", "stopclaim", "mine", "automine", "stopall"];
+app.get("/action", (req, res) => {
+  const job = req?.query?.job;
+  if (acceptAction.includes(job)) {
+    switch (job) {
+      case "claim":
+        try {
+          pm2.connect((err) => {
+            if (err) {
+              console.error(err);
+              process.exit(2);
+            }
+            pm2.restart("claim", (restartErr) => {
+              if (restartErr) {
+                console.error(restartErr);
+                res.send(restartErr);
+              }
+              pm2.disconnect();
+            });
+          });
+          res.send("Successfully start service");
+        } catch (error) {
+          res.send(restartErr, 404);
         }
-        pm2.restart("claim", (restartErr) => {
-          if (restartErr) {
-            console.error(restartErr);
-            res.send(restartErr);
-          }
-          pm2.disconnect();
-        });
-      });
-      res.send("Successfully start service");
-    } catch (error) {
-      res.send(restartErr, 404);
-    }
-  } else {
-    try {
-      pm2.stop("claim");
-      res.send("Successfully stop service");
-    } catch (error) {
-      res.send(restartErr, 404);
+        break;
+      case "stopclaim":
+        try {
+          pm2.stop("claim");
+          res.send("Successfully stop service");
+        } catch (error) {
+          res.send(restartErr, 404);
+        }
+        break;
+      case "mine":
+        try {
+          (async () => {
+            pm2.connect(async (err) => {
+              if (err) {
+                console.error(err);
+                process.exit(2);
+              }
+              await new Promise(async (resolve) => {
+                pm2.restart("start", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  resolve();
+                });
+              });
+              await new Promise(async (resolve) => {
+                pm2.stop("start-automine", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  pm2.disconnect();
+                  resolve();
+                });
+              });
+            });
+
+            res.send("Successfully start service");
+          })();
+        } catch (error) {
+          res.send(restartErr, 404);
+        }
+        break;
+      case "automine":
+        try {
+          (async () => {
+            pm2.connect(async (err) => {
+              if (err) {
+                console.error(err);
+                process.exit(2);
+              }
+              await new Promise(async (resolve) => {
+                pm2.restart("start-automine", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  resolve();
+                });
+              });
+              await new Promise(async (resolve) => {
+                pm2.stop("start", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  pm2.disconnect();
+                  resolve();
+                });
+              });
+            });
+
+            res.send("Successfully start service");
+          })();
+        } catch (error) {
+          res.send(restartErr, 404);
+        }
+        break;
+      case "stopall":
+        try {
+          (async () => {
+            pm2.connect(async (err) => {
+              if (err) {
+                console.error(err);
+                process.exit(2);
+              }
+              await new Promise(async (resolve) => {
+                pm2.stop("start", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  resolve();
+                });
+              });
+              await new Promise(async (resolve) => {
+                pm2.stop("start-automine", (restartErr) => {
+                  if (restartErr) {
+                    console.error(restartErr);
+                    res.send(restartErr);
+                  }
+                  pm2.disconnect();
+                  resolve();
+                });
+              });
+            });
+
+            res.send("Successfully start service");
+          })();
+        } catch (error) {
+          res.send(restartErr, 404);
+        }
+        break;
     }
   }
 });
