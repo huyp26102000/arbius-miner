@@ -37,7 +37,7 @@ app.get("/pm2/jobs", (req, res) => {
   });
 });
 app.get("/claim", (req, res) => {
-  const newStatus = req?.query?.status;
+  const newStatus = req?.query?.status == "true";
   if (newStatus) {
     try {
       pm2.connect((err) => {
@@ -45,7 +45,7 @@ app.get("/claim", (req, res) => {
           console.error(err);
           process.exit(2);
         }
-        pm2.restart("claim", (restartErr) => {
+        pm2.restart("start", (restartErr) => {
           if (restartErr) {
             console.error(restartErr);
             res.send(restartErr);
@@ -53,26 +53,14 @@ app.get("/claim", (req, res) => {
           pm2.disconnect();
         });
       });
-      res.send("Successfully update status");
+      res.send("Successfully start service");
     } catch (error) {
       res.send(restartErr, 404);
     }
   } else {
     try {
-      pm2.connect((err) => {
-        if (err) {
-          console.error(err);
-          process.exit(2);
-        }
-        pm2.stop("claim", (restartErr) => {
-          if (restartErr) {
-            console.error(restartErr);
-            res.send(restartErr);
-          }
-          pm2.disconnect();
-        });
-      });
-      res.send("Successfully update status");
+      pm2.stop("start");
+      res.send("Successfully stop service");
     } catch (error) {
       res.send(restartErr, 404);
     }
