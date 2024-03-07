@@ -68,19 +68,6 @@ const getLogs = async (
 async function processAutoClaim(configPath: string) {
   let coreAddress;
   const unclaimedPath = "unclaimed.json";
-  let taskids: any = [];
-  try {
-    if (existsSync(unclaimedPath)) {
-      taskids = JSON.parse(readFileSync(unclaimedPath, "utf8"));
-    } else {
-      const defaultContent = "[]";
-      writeFileSync(unclaimedPath, defaultContent, "utf8");
-    }
-  } catch (e) {
-    console.error(`unable to parse ${unclaimedPath}`);
-    process.exit(1);
-  }
-
   try {
     const mconf = JSON.parse(readFileSync(configPath, "utf8"));
     mconf["blockchain"]["private_key"] = mconf?.blockchain?.private_key_claim;
@@ -102,15 +89,13 @@ async function processAutoClaim(configPath: string) {
   const currentBlock: any = +(await wallet.provider.getBlockNumber());
   let lastScanBlock = +currentBlock - 2000000;
   console.log("Current block", currentBlock);
-  const unclaimedTasks = await getLogs(
+  const taskids = await getLogs(
     coreAddress,
     Number(lastScanBlock),
     Number(currentBlock)
   );
-  taskids = [...taskids, ...unclaimedTasks];
-  writeFileSync("unclaimed.json", JSON.stringify(taskids));
   log.debug(
-    `${unclaimedTasks.length} unclaimed tasks found for ${wallet.address}`
+    `${taskids.length} unclaimed tasks found for ${wallet.address}`
   );
   // writeFileSync('unclaimed.json', JSON.stringify(unclaimedTasks));
   await delay(2000);
