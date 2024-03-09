@@ -141,6 +141,14 @@ async function lookupAndInsertTaskInput(
 ) {
   let input: any;
 
+  const cachedInput = await dbGetTaskInput(taskid, cid);
+  if (cachedInput !== null) {
+    log.debug(`Task (${taskid}) CID (${cid}) loaded from cache`);
+    input = JSON.parse(cachedInput.data);
+    return input;
+  }
+
+  log.debug(`Task (${taskid}) CID (${cid}) being loaded from TXID (${txid})`);
   // will be populated from task cid when downloaded
   let preprocessed_str = null;
   let preprocessed_obj = null;
@@ -186,6 +194,7 @@ async function lookupAndInsertTaskInput(
       input: preprocessed_str,
     },
   });
+
   return input;
 }
 
@@ -657,10 +666,6 @@ async function processValidatorStake() {
   );
 }
 
-const delay = (delayInms: number) => {
-  return new Promise(resolve => setTimeout(resolve, delayInms));
-};
-
 async function processAutomine() {
   try {
     
@@ -699,7 +704,7 @@ async function processAutomine() {
         alreadySeenTaskTx.add(receipt.transactionHash);
       }
 
-      const { model, fee, owner, blocktime, version, cid: inputCid } =
+      const { model, fee, owner, blocktime, version, cid } =
         await lookupAndInsertTask(taskid);
       const txid = receipt.transactionHash;
       const { modelEnabled, modelTemplate, filterPassed } = checkModelFilter(
@@ -714,7 +719,7 @@ async function processAutomine() {
       );
       let taskInput = await lookupAndInsertTaskInput(
         taskid,
-        inputCid,
+        cid,
         txid,
         modelTemplate
       );
@@ -724,34 +729,31 @@ async function processAutomine() {
         log.error(`Task (${taskid}) could not find model (${model})`);
         return;
       }
-      log.info(`inputCidinputCid ${inputCid} generated`);
+
       // TODO if we have txid here we could do lookupAndInsertTaskInput
-    
       if (taskInput === null) {
         log.warn(`Task (${taskid}) input not found in db`);
         return;
       }
-      console.log(taskInput, 'taskInputtaskInput');
-      
-      const cid = await m.getcid(c, m, taskid, taskInput);
+
       if (!cid) {
         log.error(`Task (${taskid}) CID could not be generated`);
         return;
       }
-      log.info(`CIDCID ${cid} generated`);
+      log.info(`CID ${cid} generated`);
 
       const commitment = generateCommitment(wallet.address, taskid, cid);
       try {
-        const tx = arbius.signalCommitment(commitment, {
+        const tx = await arbius.signalCommitment(commitment, {
           gasLimit: 450_000,
         });
         // const receipt = await tx.wait(); // we dont wait here to be faster
-        // log.info(`Commitment signalled in ${tx.hash}`);
+        log.info(`Commitment signalled in ${tx.hash}`);
       } catch (e) {
         log.error(`Commitment submission failed ${JSON.stringify(e)}`);
         return;
       }
-      await delay(400)
+
       // we will retry in case we didnt wait long enough for commitment
       // if this fails otherwise, it could be because another submitted solution
       await expretry(
