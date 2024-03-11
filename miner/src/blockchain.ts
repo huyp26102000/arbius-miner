@@ -9,6 +9,7 @@ import BaseTokenArtifact from './artifacts/contracts/BaseTokenV1.sol/BaseTokenV1
 // import GovernorArtifact from './artifacts/contracts/GovernorV1.sol/GovernorV1.json';
 // import DelegatedValidator from './artifacts/contracts/DelegatedValidatorV1.sol/DelegatedValidatorV1.json';
 import ArbSysArtifact from './artifacts/@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol/ArbSys.json';
+import { NonceManager } from '@ethersproject/experimental';
 
 const ARBSYS_ADDR = '0x0000000000000000000000000000000000000064';
 
@@ -22,14 +23,17 @@ let arbsys:   Contract;
 export async function initializeBlockchain() {
   const provider = new ethers.providers.JsonRpcProvider(c.blockchain.rpc_url!);
   wallet = new Wallet(c.blockchain.private_key, provider);
-
+  
+  const managedSigner = new NonceManager(wallet);
   arbius   = new Contract(Config.v2_engineAddress,    EngineArtifact.abi,    wallet);
+  arbius = arbius.connect(managedSigner)
   token    = new Contract(Config.v2_baseTokenAddress, BaseTokenArtifact.abi, wallet);
   // governor = new Contract(Config.governorAddress,  GovernorArtifact.abi,  wallet);
   arbsys   = new Contract(ARBSYS_ADDR,             ArbSysArtifact.abi,    wallet);
 
   if (! c.blockchain.use_delegated_validator) {
     solver = new Contract(Config.v2_engineAddress,    EngineArtifact.abi,    wallet);
+    solver=solver.connect(managedSigner)
   } else {
     // solver = new Contract(c.blockchain.delegated_validator_address, DelegatedValidator.abi, wallet);
   }
