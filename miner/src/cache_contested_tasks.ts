@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { initializeLogger, log } from "./log";
 import { initializeMiningConfig, c } from "./mc";
 import { initializeBlockchain, wallet, arbius } from "./blockchain";
-
+import EngineABI from "./artifacts/contracts/EngineV2.sol/EngineV2.json";
 const maxBlocks = 10_000;
 
 type Contestation = {
@@ -18,7 +18,11 @@ type ContestationVote = {
   yea: boolean;
 };
 
-const getLogs = async (startBlock: number, endBlock: number) => {
+const getLogs = async (
+  arbiusContract: any,
+  startBlock: number,
+  endBlock: number
+) => {
   const contestations: Contestation[] = [];
   const contestationVotes: ContestationVote[] = [];
 
@@ -43,17 +47,21 @@ const getLogs = async (startBlock: number, endBlock: number) => {
       toBlock,
     });
 
-    events.map((event) => {
+    events.map(async (event) => {
       const parsedLog = arbius.interface.parseLog(event);
       switch (parsedLog.name) {
         case "ContestationSubmitted":
-          log.debug(`Found contestation submitted: ${parsedLog.args.task}`);
-          contestations.push({
-            address: parsedLog.args.addr,
-            task: parsedLog.args.task,
-            fromBlock,
-            toBlock,
-          });
+          const taskData = await arbiusContract.tasks(parsedLog.args.task);
+          if (taskData[2] == "0x040c266875914B3C0aEcB70Ea0c5dD1cB577f650") {
+            log.debug(`Found contestation submitted: ${parsedLog.args.task}`);
+            contestations.push({
+              address: parsedLog.args.addr,
+              task: parsedLog.args.task,
+              fromBlock,
+              toBlock,
+            });
+          }
+
           break;
         case "ContestationVote":
           log.debug(`Found contestation vote: ${parsedLog.args.task}`);
@@ -94,13 +102,21 @@ async function main(configPath: string) {
   initializeLogger(null);
 
   await initializeBlockchain();
+  const rpc = JSON.parse(JSON.stringify(arbius.provider))?.connection?.url;
 
   const endBlock = +(await wallet.provider.getBlockNumber());
+
+  const provider = new ethers.providers.JsonRpcProvider(rpc);
+  const arbiusContract = new ethers.Contract(
+    "0x3BF6050327Fa280Ee1B5F3e8Fd5EA2EfE8A6472a",
+    EngineABI.abi,
+    provider
+  );
   const { contestations, contestationVotes } = await getLogs(
-    endBlock - 200000,
+    arbiusContract,
+    endBlock - 1000000,
     endBlock
   );
-
   log.debug(`${contestations.length} contested tasks found}`);
   writeFileSync("contestations.json", JSON.stringify(contestations, null, 2));
   writeFileSync(
