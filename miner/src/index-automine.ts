@@ -751,7 +751,7 @@ async function processAutomine() {
         log.error(`Commitment submission failed ${JSON.stringify(e)}`);
         return;
       }
-      await delay(400)
+      await delay(800)
       // we will retry in case we didnt wait long enough for commitment
       // if this fails otherwise, it could be because another submitted solution
       await expretry(
