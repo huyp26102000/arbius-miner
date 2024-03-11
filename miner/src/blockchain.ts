@@ -33,7 +33,7 @@ export async function initializeBlockchain() {
 
   if (! c.blockchain.use_delegated_validator) {
     solver = new Contract(Config.v2_engineAddress,    EngineArtifact.abi,    wallet);
-    solver.connect(managedSigner)
+    solver=solver.connect(managedSigner)
   } else {
     // solver = new Contract(c.blockchain.delegated_validator_address, DelegatedValidator.abi, wallet);
   }
