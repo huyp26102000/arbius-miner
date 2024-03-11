@@ -11,11 +11,13 @@
     "start": "node build/start.js",
     "start-automine": "node build/start-automine.js",
     "scan:unclaimed": "npx ts-node ./scripts/cache_unclaimed_tasks.ts",
+    "scan:contestations": "npx ts-node ./src/cache_contested_tasks.ts",
     "start:dev": "npx nodemon",
     "watch:solution": "npx nodemon --exec \"npx ts-node ./src/solutionwatch.ts\"",
     "watch:validator": "npx nodemon --exec \"npx ts-node ./src/validatorwatch.ts\"",
     "test": "mocha -r ts-node/register",
-    "pinata:gc": "npx ts-node scripts/pinata_unpin_old_files.ts"
+    "pinata:gc": "npx ts-node scripts/pinata_unpin_old_files.ts",
+    "verify:task": "npx ts-node ./src/verifytask.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.2.22",
