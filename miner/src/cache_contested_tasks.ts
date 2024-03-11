@@ -4,6 +4,7 @@ import { initializeLogger, log } from "./log";
 import { initializeMiningConfig, c } from "./mc";
 import { initializeBlockchain, wallet, arbius } from "./blockchain";
 import EngineABI from "./artifacts/contracts/EngineV2.sol/EngineV2.json";
+import config from "./config.json";
 const maxBlocks = 10_000;
 
 type Contestation = {
@@ -20,6 +21,7 @@ type ContestationVote = {
 
 const getLogs = async (
   arbiusContract: any,
+  targetAddress: string,
   startBlock: number,
   endBlock: number
 ) => {
@@ -52,7 +54,7 @@ const getLogs = async (
       switch (parsedLog.name) {
         case "ContestationSubmitted":
           const taskData = await arbiusContract.tasks(parsedLog.args.task);
-          if (taskData[2] == "0x040c266875914B3C0aEcB70Ea0c5dD1cB577f650") {
+          if (taskData[2] == targetAddress) {
             log.debug(`Found contestation submitted: ${parsedLog.args.task}`);
             contestations.push({
               address: parsedLog.args.addr,
@@ -90,7 +92,11 @@ const getLogs = async (
   };
 };
 
-async function main(configPath: string) {
+async function main(
+  configPath: string,
+  lastBlockAmount: Number,
+  targetAddress: string
+) {
   try {
     const mconf = JSON.parse(readFileSync(configPath, "utf8"));
     initializeMiningConfig(mconf);
@@ -108,13 +114,14 @@ async function main(configPath: string) {
 
   const provider = new ethers.providers.JsonRpcProvider(rpc);
   const arbiusContract = new ethers.Contract(
-    "0x3BF6050327Fa280Ee1B5F3e8Fd5EA2EfE8A6472a",
+    config.v2_engineAddress,
     EngineABI.abi,
     provider
   );
   const { contestations, contestationVotes } = await getLogs(
     arbiusContract,
-    endBlock - 1000000,
+    targetAddress,
+    endBlock - +lastBlockAmount,
     endBlock
   );
   log.debug(`${contestations.length} contested tasks found}`);
@@ -132,4 +139,4 @@ async function main(configPath: string) {
 //   process.exit(1);
 // }
 
-main("MiningConfig.json");
+main(process.argv[2], +process.argv[3], process.argv[4]);
