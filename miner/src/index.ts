@@ -831,6 +831,7 @@ async function processSolve(taskid: string) {
 
 async function contestSolution(taskid: string) {
   try {
+    return
     log.info(`Attempt to contest ${taskid} solution`);
 
     const validatorStake = await getValidatorStaked();
