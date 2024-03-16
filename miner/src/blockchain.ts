@@ -20,22 +20,24 @@ let token:    Contract;
 let solver:   Contract; // this could be be either arbius or delegated validator
 let arbsys:   Contract;
 
-export async function initializeBlockchain() {
+export async function initializeBlockchain(coreAddress = '') {
   const provider = new ethers.providers.JsonRpcProvider(c.blockchain.rpc_url!);
   wallet = new Wallet(c.blockchain.private_key, provider);
   
   const managedSigner = new NonceManager(wallet);
   arbius   = new Contract(Config.v2_engineAddress,    EngineArtifact.abi,    wallet);
-  arbius = arbius.connect(managedSigner)
   token    = new Contract(Config.v2_baseTokenAddress, BaseTokenArtifact.abi, wallet);
   // governor = new Contract(Config.governorAddress,  GovernorArtifact.abi,  wallet);
   arbsys   = new Contract(ARBSYS_ADDR,             ArbSysArtifact.abi,    wallet);
 
   if (! c.blockchain.use_delegated_validator) {
     solver = new Contract(Config.v2_engineAddress,    EngineArtifact.abi,    wallet);
-    solver=solver.connect(managedSigner)
   } else {
     // solver = new Contract(c.blockchain.delegated_validator_address, DelegatedValidator.abi, wallet);
+  }
+  if(!coreAddress) {
+    arbius = arbius.connect(managedSigner)
+    solver = solver.connect(managedSigner)
   }
 }
 

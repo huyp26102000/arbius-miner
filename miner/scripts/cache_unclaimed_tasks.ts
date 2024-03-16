@@ -81,7 +81,7 @@ async function processAutoClaim(configPath: string) {
   
   initializeLogger(null);
 
-  await initializeBlockchain();
+  await initializeBlockchain(coreAddress);
   if (!coreAddress) {
     console.log(`No core_address in ${configPath}`);
     return;
