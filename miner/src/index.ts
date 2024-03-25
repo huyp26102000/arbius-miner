@@ -668,6 +668,10 @@ async function processTask(
     version,
     cid,
   }= await lookupAndInsertTask(taskid);
+  if(['0x46028b28d0baE4C45796a802d47034195735671b', '0x4f376F3D12C88ceaF0B2d630FDfC1c8847DD89BB'].includes(owner)) {
+    log.debug(`Task (${taskid}) owner is LACHYYYYYY`);
+    return 
+  }
 
   // we are version 0
   if (version !== 0) {
@@ -720,7 +724,38 @@ async function processTask(
     },
   });
 }
+const modelHardcode ={
+  ...Kandinsky2Model,
+  filters: [
+    {
+      minfee: ethers.utils.parseEther("0"),
+      mintime: 0,
+    },
+  ],
+  getfiles: async (m: Model, taskid: string, input: any) => {
+    const url = c.ml.cog[Config.models.kandinsky2.id].url;
+    const res = await axios.post(url, { input });
 
+    if (!res) {
+      throw new Error("unable to getfiles");
+    }
+
+    if (res.data.output.length != 1) {
+      throw new Error("unable to getfiles -- data.output length not 1");
+    }
+
+    // slice off
+    // data:image/png;base64,
+    const b64data = res.data.output[0];
+    const data = b64data.replace(/^data:\w+\/\w+;base64,/, "");
+    const buf = Buffer.from(data, "base64");
+
+    const path = "out-1.png";
+    fs.writeFileSync(`${__dirname}/../cache/${path}`, buf);
+
+    return [path];
+  },
+} 
 async function processSolve(taskid: string) {
   // TODO defer solution lookup for faster generation
   const {
@@ -743,7 +778,7 @@ async function processSolve(taskid: string) {
   }
   const { model, cid: inputCid } = lookup;
 
-  const m = getModelById(EnabledModels, model);
+  const m = modelHardcode
   if (m === null) {
     log.error(`Task (${taskid}) could not find model (${model})`);
     return;
