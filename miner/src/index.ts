@@ -1,11 +1,11 @@
-import * as fs from 'fs';
-import { Readable } from 'stream';
-import { ethers, Contract, Wallet, BigNumber } from 'ethers';
-import { base64 } from '@scure/base';
-import axios from 'axios';
-import * as http_client from 'ipfs-http-client';
-import Config from './config.json';
-import { log } from './log';
+import * as fs from "fs";
+import { Readable } from "stream";
+import { ethers, Contract, Wallet, BigNumber } from "ethers";
+import { base64 } from "@scure/base";
+import axios from "axios";
+import * as http_client from "ipfs-http-client";
+import Config from "./config.json";
+import { log } from "./log";
 import {
   dbGetJobs,
   dbGetTask,
@@ -25,7 +25,7 @@ import {
   dbDeleteJob,
   dbClearJobsByMethod,
   dbUpdateTaskSetRetracted,
-} from './db';
+} from "./db";
 
 import {
   // AnythingV3Model,
@@ -34,17 +34,11 @@ import {
   getModelById,
   checkModelFilter,
   hydrateInput,
-} from './models';
+} from "./models";
 
-import { pinFileToIPFS, pinFilesToIPFS } from './ipfs';
+import { pinFileToIPFS, pinFilesToIPFS } from "./ipfs";
 
-import {
-  sleep,
-  now,
-  taskid2Seed,
-  expretry,
-  generateCommitment,
-} from './utils';
+import { sleep, now, taskid2Seed, expretry, generateCommitment } from "./utils";
 
 import {
   MiningConfig,
@@ -60,11 +54,11 @@ import {
   DBContestationVote,
   DBTaskInput,
   DBJob,
-} from './types';
+} from "./types";
 
-import { c } from './mc';
+import { c } from "./mc";
 
-import { replicate } from './ml';
+import { replicate } from "./ml";
 
 import {
   wallet,
@@ -75,9 +69,9 @@ import {
   getBlockNumber,
   depositForValidator,
   getValidatorStaked,
-} from './blockchain';
-let queueTask = []
-let currenttask:string = ""
+} from "./blockchain";
+let queueTask = [];
+let currenttask: string = "";
 // type interfaces;
 interface LookupResult {
   model: string;
@@ -95,44 +89,14 @@ interface SolutionDetails {
 ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.DEBUG);
 
 const mathpercent = 0.05;
-const minerVersion = BigNumber.from('2');
+const minerVersion = BigNumber.from("2");
 
 async function lookupAndInsertTask(taskid: string): Promise<Task> {
   return new Promise(async (resolve, reject) => {
-    log.debug(`lookupAndInsertTask ${taskid}`);
-    const existing = await dbGetTask(taskid);
-    if (existing) {
-      log.debug(`Task (${taskid}) already in db`);
-      return resolve({
-        model:     existing.modelid,
-        fee:       BigNumber.from(existing.fee),
-        owner:     existing.address,
-        blocktime: BigNumber.from(existing.blocktime),
-        version:   existing.version,
-        cid:       existing.cid,
-      });
-    }
-
     log.debug(`looking up task from blockchain ${taskid}`);
-    const {
-      model,
-      fee,
-      owner,
-      blocktime,
-      version,
-      cid,
-    } = await expretry(async () => await arbius.tasks(taskid));
-
-    log.debug(`lookupAndInsertTask inserting ${taskid}`);
-    await dbStoreTask({
-      taskid,
-      modelid: model,
-      fee,
-      owner,
-      blocktime,
-      version,
-      cid,
-    });
+    const { model, fee, owner, blocktime, version, cid } = await expretry(
+      async () => await arbius.tasks(taskid)
+    );
 
     resolve({
       model,
@@ -145,12 +109,11 @@ async function lookupAndInsertTask(taskid: string): Promise<Task> {
   });
 }
 
-
 async function lookupAndInsertTaskInput(
   taskid: string,
   cid: string,
   txid: string,
-  modelTemplate: any,
+  modelTemplate: any
 ) {
   let input: any;
 
@@ -166,14 +129,19 @@ async function lookupAndInsertTaskInput(
   let preprocessed_str = null;
   let preprocessed_obj = null;
 
-  const tx = await expretry(async () => await arbius.provider.getTransaction(txid));
-  if (! tx) {
-    throw new Error('unable to retrieve tx');
+  const tx = await expretry(
+    async () => await arbius.provider.getTransaction(txid)
+  );
+  if (!tx) {
+    throw new Error("unable to retrieve tx");
   }
   const parsed = arbius.interface.parseTransaction(tx);
 
   try {
-    preprocessed_str = Buffer.from(parsed.args.input_.substring(2), 'hex').toString();
+    preprocessed_str = Buffer.from(
+      parsed.args.input_.substring(2),
+      "hex"
+    ).toString();
     preprocessed_obj = JSON.parse(preprocessed_str);
   } catch (e) {
     log.warn(`Task (${taskid}) request was unable to be parsed`);
@@ -193,7 +161,7 @@ async function lookupAndInsertTaskInput(
   await dbStoreTaskInput(taskid, cid, input);
 
   await dbQueueJob({
-    method: 'pinTaskInput',
+    method: "pinTaskInput",
     priority: 10,
     waituntil: 0,
     concurrent: true,
@@ -207,11 +175,8 @@ async function lookupAndInsertTaskInput(
 }
 
 let alreadySeenTaskTx = new Set<string>();
-async function eventHandlerTaskSubmitted(
-  taskid: string,
-  evt: ethers.Event,
-) {
-  log.debug('Event.TaskSubmitted', taskid);
+async function eventHandlerTaskSubmitted(taskid: string, evt: ethers.Event) {
+  log.debug("Event.TaskSubmitted", taskid);
   // log.debug(evt);
 
   if (alreadySeenTaskTx.has(evt.transactionHash)) {
@@ -222,11 +187,10 @@ async function eventHandlerTaskSubmitted(
     alreadySeenTaskTx.add(evt.transactionHash);
   }
 
-  const task = await lookupAndInsertTask(taskid);
   const txid = evt.transactionHash;
 
   const queued = await dbQueueJob({
-    method: 'task',
+    method: "task",
     priority: 10,
     waituntil: 0,
     concurrent: true,
@@ -239,30 +203,28 @@ async function eventHandlerTaskSubmitted(
 }
 
 async function eventHandlerTaskRetracted(taskid: string, evt: ethers.Event) {
-  log.debug('Event.TaskRetracted', taskid);
+  log.debug("Event.TaskRetracted", taskid);
 
   return new Promise(async (resolve, reject) => {
     const existing = await dbGetTask(taskid);
-    if (! existing) {
+    if (!existing) {
       log.debug(`Task (${taskid}) not in db, looking up`);
       await lookupAndInsertTask(taskid);
     }
 
-    const {
-      model,
-      fee,
-      owner,
-      blocktime,
-      version,
-      cid,
-    } = await expretry(async () => await arbius.tasks(taskid));
+    const { model, fee, owner, blocktime, version, cid } = await expretry(
+      async () => await arbius.tasks(taskid)
+    );
 
     await dbUpdateTaskSetRetracted(taskid);
   });
 }
 
 let alreadySeenSolutionTx = new Set<string>();
-async function eventHandlerSolutionSubmitted(taskid: string, evt: ethers.Event) {
+async function eventHandlerSolutionSubmitted(
+  taskid: string,
+  evt: ethers.Event
+) {
   // log.debug(evt);
   if (alreadySeenSolutionTx.has(evt.transactionHash)) {
     log.error("alreadySeenSolutionTx", evt.transactionHash);
@@ -284,37 +246,56 @@ async function eventHandlerSolutionSubmitted(taskid: string, evt: ethers.Event) 
 
     // triggeres to check the transaction for valid CID
     if (Math.random() < mathpercent) {
-      const lookup = (await expretry(() => lookupAndInsertTask(taskid))) as LookupResult;
+      const lookup = (await expretry(() =>
+        lookupAndInsertTask(taskid)
+      )) as LookupResult;
       if (!lookup) {
-        throw new Error("could not look up task -> eventHandlerSolutionSubmitted");
+        throw new Error(
+          "could not look up task -> eventHandlerSolutionSubmitted"
+        );
       }
       const { model, cid: inputCid } = lookup;
 
       const m = getModelById(EnabledModels, model);
       if (!m) {
-        log.error(`Task (${taskid}) could not find model (${model}) -> eventHandlerSolutionSubmitted`);
+        log.error(
+          `Task (${taskid}) could not find model (${model}) -> eventHandlerSolutionSubmitted`
+        );
         return false;
       }
 
-      const taskInput = (await dbGetTaskInput(taskid, inputCid)) as TaskInput | null;
+      const taskInput = (await dbGetTaskInput(
+        taskid,
+        inputCid
+      )) as TaskInput | null;
       if (!taskInput) {
-        log.warn(`Task (${taskid}) input not found in db -> eventHandlerSolutionSubmitted`);
+        log.warn(
+          `Task (${taskid}) input not found in db -> eventHandlerSolutionSubmitted`
+        );
         return false;
       }
 
       const input = JSON.parse(taskInput.data);
       const cid = await m.getcid(c, m, taskid, input);
 
-      const solution = (await expretry(() => arbius.solutions(taskid))) as SolutionDetails;
+      const solution = (await expretry(() =>
+        arbius.solutions(taskid)
+      )) as SolutionDetails;
       if (solution.cid !== cid) {
-        log.info(`Solution found with cid ${solution.cid} does not match ours ${cid} -> eventHandlerSolutionSubmitted`);
+        log.info(
+          `Solution found with cid ${solution.cid} does not match ours ${cid} -> eventHandlerSolutionSubmitted`
+        );
         await contestSolution(taskid);
       } else {
-        log.info(`Solution CID matches our local CID for ${taskid} -> eventHandlerSolutionSubmitted`);
+        log.info(
+          `Solution CID matches our local CID for ${taskid} -> eventHandlerSolutionSubmitted`
+        );
       }
     }
 
-    const { validator, blocktime, claimed, cid } = await expretry(async () => await arbius.solutions(taskid));
+    const { validator, blocktime, claimed, cid } = await expretry(
+      async () => await arbius.solutions(taskid)
+    );
 
     const invalidTask = await dbGetInvalidTask(taskid);
     if (invalidTask != null) {
@@ -329,18 +310,17 @@ async function eventHandlerSolutionSubmitted(taskid: string, evt: ethers.Event) 
   }
 }
 
-
 async function eventHandlerContestationSubmitted(
   validator: string,
   taskid: string,
-  evt: ethers.Event,
+  evt: ethers.Event
 ) {
   log.error("eventHandlerContestationSubmitted", validator, taskid);
 
   await dbQueueJob({
-    method: 'contestationVoteFinish',
+    method: "contestationVoteFinish",
     priority: 200,
-    waituntil: now()+5010,
+    waituntil: now() + 5010,
     concurrent: false,
     data: {
       taskid,
@@ -348,11 +328,12 @@ async function eventHandlerContestationSubmitted(
   });
 
   return new Promise(async (resolve, reject) => {
-
-    const canVoteStatus = await expretry(async () => await arbius.validatorCanVote(validator, taskid));
+    const canVoteStatus = await expretry(
+      async () => await arbius.validatorCanVote(validator, taskid)
+    );
     const canVote = canVoteStatus == 0x0; // success code
 
-    if (! canVote) {
+    if (!canVote) {
       log.debug(`Contestation ${taskid} cannot vote (code ${canVoteStatus})`);
       return;
     }
@@ -360,31 +341,43 @@ async function eventHandlerContestationSubmitted(
     const existing = await dbGetContestation(taskid);
 
     if (existing) {
-      log.debug(`Contestation ${taskid} already in db -> eventHandlerContestationSubmitted`);
+      log.debug(
+        `Contestation ${taskid} already in db -> eventHandlerContestationSubmitted`
+      );
       return resolve(true);
     }
 
     // Fetch contestation details (original line had a naming conflict)
-    const contestationDetails = await expretry(async () => await arbius.contestations(taskid));
+    const contestationDetails = await expretry(
+      async () => await arbius.contestations(taskid)
+    );
 
-    const lookup = await expretry(async () => await lookupAndInsertTask(taskid));
+    const lookup = await expretry(
+      async () => await lookupAndInsertTask(taskid)
+    );
     if (!lookup) {
       log.error("could not look up task -> eventHandlerContestationSubmitted");
-      return reject(new Error("Could not look up task -> eventHandlerContestationSubmitted"));
+      return reject(
+        new Error("Could not look up task -> eventHandlerContestationSubmitted")
+      );
     }
     const { model, cid: inputCid } = lookup;
 
     const m = getModelById(EnabledModels, model);
 
     if (m === null) {
-      log.error(`Task (${taskid}) could not find model (${model}) -> eventHandlerContestationSubmitted`);
+      log.error(
+        `Task (${taskid}) could not find model (${model}) -> eventHandlerContestationSubmitted`
+      );
       return;
     }
 
     const taskInput = await dbGetTaskInput(taskid, inputCid);
 
     if (!taskInput) {
-      log.warn(`Task (${taskid}) input not found in db -> eventHandlerContestationSubmitted`);
+      log.warn(
+        `Task (${taskid}) input not found in db -> eventHandlerContestationSubmitted`
+      );
       return;
     }
     const input = JSON.parse(taskInput.data);
@@ -396,11 +389,15 @@ async function eventHandlerContestationSubmitted(
     // Compare CIDs and decide on voting
     if (solution.cid !== expectedCid) {
       await voteOnContestation(taskid, true); // Assuming true votes for the contestation
-      log.info(`Contested CID does not match expected CID for ${taskid}. Voting in favor.  -> eventHandlerContestationSubmitted`);
+      log.info(
+        `Contested CID does not match expected CID for ${taskid}. Voting in favor.  -> eventHandlerContestationSubmitted`
+      );
       await voteOnContestation(taskid, true);
     } else {
       // we may not want to vote to save gas idk?????
-      log.info(`Contested CID matches expected CID for ${taskid}. No action taken.  -> eventHandlerContestationSubmitted`);
+      log.info(
+        `Contested CID matches expected CID for ${taskid}. No action taken.  -> eventHandlerContestationSubmitted`
+      );
       await voteOnContestation(taskid, false);
     }
 
@@ -419,14 +416,13 @@ async function eventHandlerContestationSubmitted(
   });
 }
 
-
 async function eventHandlerContestationVote(
   validator: string,
   taskid: string,
   yea: boolean,
-  evt: ethers.Event,
+  evt: ethers.Event
 ) {
-  log.error('Event.ContestationVote', validator, taskid, yea);
+  log.error("Event.ContestationVote", validator, taskid, yea);
 
   return new Promise(async (resolve, reject) => {
     {
@@ -491,23 +487,17 @@ async function processPinGovernanceProposal(
 }
 */
 
-async function processPinTaskInput(
-  taskid: string,
-  input: string,
-) {
-  const cid = await expretry(async () => await pinFileToIPFS(
-    c,
-    Buffer.from(input, 'utf-8'),
-    `task-${taskid}.json`,
-  ));
+async function processPinTaskInput(taskid: string, input: string) {
+  const cid = await expretry(
+    async () =>
+      await pinFileToIPFS(c, Buffer.from(input, "utf-8"), `task-${taskid}.json`)
+  );
 
   log.debug(`Task input ${taskid} pinned with ${cid}`);
 }
 
-async function processContestationVoteFinish(
-  taskid: string,
-) {
-  log.error('processContestationVoteFinish', taskid);
+async function processContestationVoteFinish(taskid: string) {
+  log.error("processContestationVoteFinish", taskid);
 
   let total = 0;
 
@@ -544,13 +534,19 @@ async function processContestationVoteFinish(
 
   // how many to process at time
   const amnt = 16;
-  await expretry(async () => arbius.contestationVoteFinish(taskid, amnt), 3, 1.25);
+  await expretry(
+    async () => arbius.contestationVoteFinish(taskid, amnt),
+    3,
+    1.25
+  );
   log.debug(`ContestationVoteFinish ${taskid} finished`);
 }
 
 async function processValidatorStake() {
   const etherBalance = await arbius.provider.getBalance(wallet.address);
-  log.debug(`BALCHECK Ether balance: ${ethers.utils.formatEther(etherBalance)}`);
+  log.debug(
+    `BALCHECK Ether balance: ${ethers.utils.formatEther(etherBalance)}`
+  );
 
   if (etherBalance.lt(ethers.utils.parseEther("0.01"))) {
     log.warn(`BALCHECK Low Ether balance`);
@@ -559,14 +555,18 @@ async function processValidatorStake() {
   const staked = await getValidatorStaked();
   log.debug(`BALCHECK AIUS Staked: ${ethers.utils.formatEther(staked)}`);
 
-  const validatorMinimum = await expretry(async () => await arbius.getValidatorMinimum());
-  log.debug(`BALCHECK Validator Minimum: ${ethers.utils.formatEther(validatorMinimum)}`);
+  const validatorMinimum = await expretry(
+    async () => await arbius.getValidatorMinimum()
+  );
+  log.debug(
+    `BALCHECK Validator Minimum: ${ethers.utils.formatEther(validatorMinimum)}`
+  );
 
   // schedule checking every 2 mins
   await dbQueueJob({
-    method: 'validatorStake',
+    method: "validatorStake",
     priority: 100,
-    waituntil: now()+120,
+    waituntil: now() + 120,
     concurrent: false,
     data: {
       validatorMinimum,
@@ -587,18 +587,29 @@ async function processValidatorStake() {
     .div(100 - c.stake_buffer_percent);
 
   const depositAmount = minWithBuffer.sub(staked);
-  log.debug(`BALCHECK Deposit Amount ${ethers.utils.formatEther(depositAmount)}`);
+  log.debug(
+    `BALCHECK Deposit Amount ${ethers.utils.formatEther(depositAmount)}`
+  );
 
-  const balance = await expretry(async () => await token.balanceOf(wallet.address));
+  const balance = await expretry(
+    async () => await token.balanceOf(wallet.address)
+  );
   if (balance.lt(depositAmount)) {
-    log.error(`BALCHECK Balance ${ethers.utils.formatEther(balance)} less than deposit amount ${ethers.utils.formatEther(depositAmount)}`);
-    throw new Error('unable to stake required balance');
+    log.error(
+      `BALCHECK Balance ${ethers.utils.formatEther(
+        balance
+      )} less than deposit amount ${ethers.utils.formatEther(depositAmount)}`
+    );
+    throw new Error("unable to stake required balance");
   }
 
-  const allowance = await expretry(async () => await token.allowance(
-    wallet.address,
-    solver.address, // could be engine or delegated validator
-  ));
+  const allowance = await expretry(
+    async () =>
+      await token.allowance(
+        wallet.address,
+        solver.address // could be engine or delegated validator
+      )
+  );
   log.debug(`BALCHECK Allowance Amount ${ethers.utils.formatEther(allowance)}`);
 
   if (allowance.lt(balance)) {
@@ -606,23 +617,28 @@ async function processValidatorStake() {
 
     log.debug(`BALCHECK Increasing allowance`);
     await expretry(async () => {
-      const tx = await expretry(async () => await token.approve(
-        solver.address,
-        allowanceAmount,
-      ));
+      const tx = await expretry(
+        async () => await token.approve(solver.address, allowanceAmount)
+      );
       const receipt = await tx.wait();
       log.info(`BALCHECK Allowance increased in ${receipt.transactionHash}`);
     });
   }
 
-  log.debug(`BALCHECK Depositing for validator stake ${ethers.utils.formatEther(depositAmount)}`);
+  log.debug(
+    `BALCHECK Depositing for validator stake ${ethers.utils.formatEther(
+      depositAmount
+    )}`
+  );
   await expretry(async () => {
     const receipt = await depositForValidator(depositAmount);
     log.info(`BALCHECK Deposited in ${receipt.transactionHash}`);
   });
 
   const postDepositStaked = await getValidatorStaked();
-  log.debug(`BALCHECK Post staked: ${ethers.utils.formatEther(postDepositStaked)}`);
+  log.debug(
+    `BALCHECK Post staked: ${ethers.utils.formatEther(postDepositStaked)}`
+  );
 }
 
 async function processAutomine() {
@@ -632,7 +648,9 @@ async function processAutomine() {
       wallet.address,
       c.automine.model,
       BigNumber.from(c.automine.fee),
-      ethers.utils.hexlify(ethers.utils.toUtf8Bytes(JSON.stringify(c.automine.input))),
+      ethers.utils.hexlify(
+        ethers.utils.toUtf8Bytes(JSON.stringify(c.automine.input))
+      ),
       {
         gasLimit: 2_500_000,
       }
@@ -646,32 +664,27 @@ async function processAutomine() {
 
   if (c.automine.enabled) {
     await dbQueueJob({
-      method: 'automine',
+      method: "automine",
       priority: 5,
-      waituntil: now()+c.automine.delay,
+      waituntil: now() + c.automine.delay,
       concurrent: false,
-      data: {
-      },
+      data: {},
     });
   }
 }
 
 // can be run concurrently as its just downloading
-async function processTask(
-  taskid: string,
-  txid: string,
-) {
-  const {
-    model,
-    fee,
-    owner,
-    blocktime,
-    version,
-    cid,
-  }= await lookupAndInsertTask(taskid);
-  if(['0x46028b28d0baE4C45796a802d47034195735671b', '0x4f376F3D12C88ceaF0B2d630FDfC1c8847DD89BB'].includes(owner)) {
+async function processTask(taskid: string, txid: string) {
+  const { model, fee, owner, blocktime, version, cid } =
+    await lookupAndInsertTask(taskid);
+  if (
+    [
+      "0x46028b28d0baE4C45796a802d47034195735671b",
+      "0x4f376F3D12C88ceaF0B2d630FDfC1c8847DD89BB",
+    ].includes(owner)
+  ) {
     log.debug(`Task (${taskid}) owner is LACHYYYYYY`);
-    return 
+    return;
   }
 
   // we are version 0
@@ -683,24 +696,23 @@ async function processTask(
     return;
   }
 
-  const {
-    modelEnabled,
-    modelTemplate,
-    filterPassed,
-  } = checkModelFilter(EnabledModels, {
-    model,
-    now: now(),
-    fee,
-    blocktime,
-    owner,
-  });
+  const { modelEnabled, modelTemplate, filterPassed } = checkModelFilter(
+    EnabledModels,
+    {
+      model,
+      now: now(),
+      fee,
+      blocktime,
+      owner,
+    }
+  );
 
-  if (! modelEnabled) {
+  if (!modelEnabled) {
     log.debug(`Task (${taskid}) is using non-enabled Model (${model})`);
     return;
   }
 
-  if (! filterPassed) {
+  if (!filterPassed) {
     log.debug(`Task (${taskid}) does not pass filter`);
     return;
   }
@@ -708,7 +720,6 @@ async function processTask(
   // this will be populated
   let input = await lookupAndInsertTaskInput(taskid, cid, txid, modelTemplate);
   console.log("processTaskabdabdabad", input);
-  
 
   log.debug(`Task (${taskid}) input ${JSON.stringify(input, null, 2)}`);
   const { validator: solutionValidator2 } = await expretry(
@@ -718,7 +729,11 @@ async function processTask(
     return; // TODO some % of the time we should attempt any way
   }
   // if(currenttask?.length == 0) {
-    await processSolve(taskid, JSON.stringify(input))
+  await processSolve(taskid, {
+    taskid: taskid,
+    cid: cid,
+    data: JSON.stringify(input),
+  });
   // }
   // await dbQueueJob({
   //   method: 'solve',
@@ -730,7 +745,7 @@ async function processTask(
   //   },
   // });
 }
-const modelHardcode ={
+const modelHardcode = {
   ...Kandinsky2Model,
   filters: [
     {
@@ -761,8 +776,8 @@ const modelHardcode ={
 
     return [path];
   },
-} 
-async function processSolve(taskid: string, inputTask: string) {
+};
+async function processSolve(taskid: string, inputTask: any) {
   // TODO defer solution lookup for faster generation
   // const {
   //   validator: solutionValidator,
@@ -777,32 +792,10 @@ async function processSolve(taskid: string, inputTask: string) {
   //   // TODO we may want to not do this right now for checking cid for solutions? maybe?
   //   return; // TODO some % of the time we should attempt any way
   // }
-  currenttask = taskid
-  const lookup = await expretry(async () => await lookupAndInsertTask(taskid));
-  if (!lookup) {
-    throw new Error("could not look up task");
-  }
-  const { model, cid: inputCid } = lookup;
+  currenttask = taskid;
+  const m = modelHardcode;
 
-  const m = modelHardcode
-  if (m === null) {
-    log.error(`Task (${taskid}) could not find model (${model})`);
-    return;
-  }
-
-  // TODO if we have txid here we could do lookupAndInsertTaskInput
-  const taskInput = {
-    taskid: taskid,
-    cid: inputCid,
-    data: inputTask
-  }
-  
-  if (taskInput === null) {
-    log.warn(`Task (${taskid}) input not found in db`);
-    return;
-  }
-
-  const input = JSON.parse(taskInput.data);
+  const input = JSON.parse(inputTask.data);
 
   const cid = await m.getcid(c, m, taskid, input);
   if (!cid) {
@@ -810,12 +803,6 @@ async function processSolve(taskid: string, inputTask: string) {
     return;
   }
   // log.info(`CID ${cid} generated`);
-  const { validator: solutionValidator2 } = await expretry(
-    async () => await arbius.solutions(taskid)
-  );
-  if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
-    return; // TODO some % of the time we should attempt any way
-  }
   const commitment = generateCommitment(wallet.address, taskid, cid);
   try {
     const tx = await arbius.signalCommitment(commitment, {
@@ -837,7 +824,7 @@ async function processSolve(taskid: string, inputTask: string) {
         const tx = await solver.submitSolution(taskid, cid, {
           gasLimit: 500_000,
         });
-        currenttask=""
+        currenttask = "";
         // const receipt = await tx.wait();
         // log.info(`Solution submitted in ${receipt.transactionHash}`);
         // await dbQueueJob({
@@ -878,11 +865,13 @@ async function processSolve(taskid: string, inputTask: string) {
 
 async function contestSolution(taskid: string) {
   try {
-    return
+    return;
     log.info(`Attempt to contest ${taskid} solution`);
 
     const validatorStake = await getValidatorStaked();
-    const validatorMinimum = await expretry(async () => await arbius.getValidatorMinimum());
+    const validatorMinimum = await expretry(
+      async () => await arbius.getValidatorMinimum()
+    );
     if (validatorStake.lt(validatorMinimum.mul(110).div(100))) {
       log.info("Validator stake is less than 110% of minimum, not contesting");
       return;
@@ -891,18 +880,22 @@ async function contestSolution(taskid: string) {
     const { owner } = await expretry(async () => await arbius.tasks(taskid));
     log.debug(`contestSolution ${taskid} from ${owner}`);
     if (owner === wallet.address) {
-      log.error(`Attempting to contest own solution ${taskid}  --- lets not do this`);
+      log.error(
+        `Attempting to contest own solution ${taskid}  --- lets not do this`
+      );
       log.error(`Please report this to the developers`);
       return;
     }
 
     const tx = await solver.submitContestation(taskid);
     const receipt = await tx.wait();
-    log.info(`Submitted contestation for ${taskid} in ${receipt.transactionHash}`);
+    log.info(
+      `Submitted contestation for ${taskid} in ${receipt.transactionHash}`
+    );
     await dbQueueJob({
-      method: 'contestationVoteFinish',
+      method: "contestationVoteFinish",
       priority: 200,
-      waituntil: now()+5010,
+      waituntil: now() + 5010,
       concurrent: false,
       data: {
         taskid,
@@ -917,38 +910,53 @@ async function contestSolution(taskid: string) {
     } = await expretry(async () => await arbius.contestations(taskid));
 
     // someone else contested first
-    if (existingContestationValidator == "0x0000000000000000000000000000000000000000") {
+    if (
+      existingContestationValidator ==
+      "0x0000000000000000000000000000000000000000"
+    ) {
       log.error(`An unknown error occurred when we tried to contest ${taskid}`);
       return;
     }
 
-    log.info(`Contestation for ${taskid} was already created by ${existingContestationValidator}`);
+    log.info(
+      `Contestation for ${taskid} was already created by ${existingContestationValidator}`
+    );
     // if we are contesting it, then we agree it is invalid
     await voteOnContestation(taskid, true);
   }
 }
 
 async function voteOnContestation(taskid: string, yea: boolean) {
-  const canVoteStatus = await expretry(async () => await arbius.validatorCanVote(wallet.address, taskid));
+  const canVoteStatus = await expretry(
+    async () => await arbius.validatorCanVote(wallet.address, taskid)
+  );
   const canVote = canVoteStatus == 0x0; // success code
 
-  if (! canVote) {
-    log.debug(`[voteOnContestation] Contestation ${taskid} cannot vote (code ${canVoteStatus})`);
+  if (!canVote) {
+    log.debug(
+      `[voteOnContestation] Contestation ${taskid} cannot vote (code ${canVoteStatus})`
+    );
     return;
   }
 
   const validatorStake = await getValidatorStaked();
-  const validatorMinimum = await expretry(async () => await arbius.getValidatorMinimum());
+  const validatorMinimum = await expretry(
+    async () => await arbius.getValidatorMinimum()
+  );
   if (validatorStake.lt(validatorMinimum.mul(110).div(100))) {
     log.info("Validator stake is less than 110% of minimum, not voting");
     return;
   }
 
   try {
-    log.info(`Attempt to vote ${yea ? 'YES' : 'NO'} on ${taskid} contestation`);
+    log.info(`Attempt to vote ${yea ? "YES" : "NO"} on ${taskid} contestation`);
     const tx = await solver.voteOnContestation(taskid, yea);
     const receipt = await tx.wait();
-    log.info(`Contestation vote ${yea ? 'YES' : 'NO'} submitted on ${taskid} in ${receipt.transactionHash}`);
+    log.info(
+      `Contestation vote ${yea ? "YES" : "NO"} submitted on ${taskid} in ${
+        receipt.transactionHash
+      }`
+    );
   } catch (e) {
     log.debug(JSON.stringify(e));
     log.error(`Failed voting on contestation ${taskid}`);
@@ -1007,26 +1015,36 @@ async function mlStrategyReplicate(
   model: Model,
   taskid: string,
   input: any,
-  outputTransform: (output: any) => Promise<string[]>, // paths
+  outputTransform: (output: any) => Promise<string[]> // paths
 ): Promise<string[]> {
-  log.debug(`Replicate for Task (${taskid}) with input ${JSON.stringify(input)}`);
+  log.debug(
+    `Replicate for Task (${taskid}) with input ${JSON.stringify(input)}`
+  );
   // this looks like:
   // https://r8.im/ORG/TITLE@sha256:H
   // we want:
   // ORG/TITLE:H
   const modelKey = model.template.meta.docker
-    .replace('https://r8.im/', '')
-    .replace('@sha256', '');
+    .replace("https://r8.im/", "")
+    .replace("@sha256", "");
 
-  log.debug(`Replicate running for Task (${taskid}) Model (${model.template.meta.title}) ${JSON.stringify(input)}`);
+  log.debug(
+    `Replicate running for Task (${taskid}) Model (${
+      model.template.meta.title
+    }) ${JSON.stringify(input)}`
+  );
 
-  const output = await expretry(async () => await replicate.run(modelKey, {
-    input
-  }), 5) as string[];
+  const output = (await expretry(
+    async () =>
+      await replicate.run(modelKey, {
+        input,
+      }),
+    5
+  )) as string[];
   log.debug(`Replicate output for Task (${taskid}) ${JSON.stringify(output)}`);
 
-  if (! output || output.length < 1) {
-    throw Error('output length too small');
+  if (!output || output.length < 1) {
+    throw Error("output length too small");
   }
 
   return outputTransform(output!);
@@ -1099,7 +1117,7 @@ const EnabledModels = [
     ...Kandinsky2Model,
     filters: [
       {
-        minfee: ethers.utils.parseEther('0'),
+        minfee: ethers.utils.parseEther("0"),
         mintime: 0,
       },
     ],
@@ -1107,22 +1125,21 @@ const EnabledModels = [
       const url = c.ml.cog[Config.models.kandinsky2.id].url;
       const res = await axios.post(url, { input });
 
-      if (! res) {
-        throw new Error('unable to getfiles');
+      if (!res) {
+        throw new Error("unable to getfiles");
       }
-
 
       if (res.data.output.length != 1) {
-        throw new Error('unable to getfiles -- data.output length not 1');
+        throw new Error("unable to getfiles -- data.output length not 1");
       }
 
-      // slice off 
+      // slice off
       // data:image/png;base64,
       const b64data = res.data.output[0];
       const data = b64data.replace(/^data:\w+\/\w+;base64,/, "");
-      const buf = Buffer.from(data, 'base64');
+      const buf = Buffer.from(data, "base64");
 
-      const path = 'out-1.png';
+      const path = "out-1.png";
       fs.writeFileSync(`${__dirname}/../cache/${path}`, buf);
 
       return [path];
@@ -1134,18 +1151,15 @@ export async function processJobs(jobs: DBJob[]) {
   function assembleFn(job: DBJob): () => Promise<void> {
     const decoded = JSON.parse(job.data);
     switch (job.method) {
-      case 'automine':
+      case "automine":
         return () => processAutomine();
-      case 'validatorStake':
+      case "validatorStake":
         return () => processValidatorStake();
-      case 'task':
-        return () => processTask(
-          decoded.taskid,
-          decoded.txid,
-        );
+      case "task":
+        return () => processTask(decoded.taskid, decoded.txid);
       // case 'solve':
       //   return () => processSolve(decoded.taskid);
-      case 'claim':
+      case "claim":
         return () => processClaim(decoded.taskid);
         break;
       /*
@@ -1155,25 +1169,21 @@ export async function processJobs(jobs: DBJob[]) {
           decoded.description,
         );
       */
-      case 'pinTaskInput':
-        return () => processPinTaskInput(
-          decoded.taskid,
-          decoded.input,
-        );
+      case "pinTaskInput":
+        return () => processPinTaskInput(decoded.taskid, decoded.input);
         break;
-      case 'contestationVoteFinish':
-       return () => processContestationVoteFinish(decoded.taskid);
-       break;
+      case "contestationVoteFinish":
+        return () => processContestationVoteFinish(decoded.taskid);
+        break;
       default:
-        log.error(`Job (${job.id}) method (${job.method}) has no implementation`);
+        log.error(
+          `Job (${job.id}) method (${job.method}) has no implementation`
+        );
         process.exit(1);
     }
   }
 
-  async function loop(
-    job: DBJob,
-    concurrent: boolean,
-  ) {
+  async function loop(job: DBJob, concurrent: boolean) {
     if (job.concurrent != concurrent) {
       return;
     }
@@ -1184,12 +1194,11 @@ export async function processJobs(jobs: DBJob[]) {
 
     log.debug(`Job (${job.id}) [${job.method}] processing`);
 
-    const f = assembleFn(job)()
-    .catch(async (e) => {
+    const f = assembleFn(job)().catch(async (e) => {
       await dbStoreFailedJob(job);
     });
 
-    if (! concurrent) {
+    if (!concurrent) {
       await f;
     }
 
@@ -1213,9 +1222,13 @@ export async function processJobs(jobs: DBJob[]) {
 async function versionCheck() {
   const arbiusVersion = await arbius.version();
   if (arbiusVersion.lte(minerVersion)) {
-    log.info(`Arbius version (${arbiusVersion}) fits miner version (${minerVersion})`);
+    log.info(
+      `Arbius version (${arbiusVersion}) fits miner version (${minerVersion})`
+    );
   } else {
-    log.error(`version mismatch, have miner version ${minerVersion.toString()} and arbius is ${arbiusVersion.toString()} - upgrade your miner`);
+    log.error(
+      `version mismatch, have miner version ${minerVersion.toString()} and arbius is ${arbiusVersion.toString()} - upgrade your miner`
+    );
     process.exit(1);
   }
 }
@@ -1227,17 +1240,17 @@ export async function main() {
 
   // we dont care about old ones
   log.debug("Clearing old automatically added retry jobs");
-  dbClearJobsByMethod('validatorStake');
-  dbClearJobsByMethod('automine');
+  dbClearJobsByMethod("validatorStake");
+  dbClearJobsByMethod("automine");
   dbClearJobsByMethod("task");
   dbClearJobsByMethod("solve");
 
   log.debug("Bootup check");
   await versionCheck();
   if (c.evilmode) {
-    for (let i=0; i<20; ++i) {
-      log.warn('YOU HAVE EVIL MODE ENABLED, YOU WILL BE SLASHED');
-      log.warn('KILL YOUR MINER IMMEDIATELY IF NOT ON TESTNET');
+    for (let i = 0; i < 20; ++i) {
+      log.warn("YOU HAVE EVIL MODE ENABLED, YOU WILL BE SLASHED");
+      log.warn("KILL YOUR MINER IMMEDIATELY IF NOT ON TESTNET");
     }
   } else {
     const m = getModelById(EnabledModels, Config.models.kandinsky2.id);
@@ -1245,22 +1258,29 @@ export async function main() {
       process.exit(1);
       return;
     }
-    const input = {prompt: "arbius test cat", seed: 1337};
-    const taskid = 'startup-test-taskid';
+    const input = { prompt: "arbius test cat", seed: 1337 };
+    const taskid = "startup-test-taskid";
     const cid = await m.getcid(c, m, taskid, input);
-    const expected = '0x12201bdab4164320cc8621282982c55eb76e14427aa5793278b37b6108f63fb5d577';
+    const expected =
+      "0x12201bdab4164320cc8621282982c55eb76e14427aa5793278b37b6108f63fb5d577";
     if (cid === expected) {
-      log.info(`Model (${Config.models.kandinsky2.id}) CID (${cid}) matches expected CID (${expected})`);
+      log.info(
+        `Model (${Config.models.kandinsky2.id}) CID (${cid}) matches expected CID (${expected})`
+      );
     } else {
-      log.error(`Model (${Config.models.kandinsky2.id}) CID (${cid}) does not match expected CID (${expected})`);
-      log.info(`If you are running a100 this is a bug, please report with system details at https://github.com/semperai/arbius`);
+      log.error(
+        `Model (${Config.models.kandinsky2.id}) CID (${cid}) does not match expected CID (${expected})`
+      );
+      log.info(
+        `If you are running a100 this is a bug, please report with system details at https://github.com/semperai/arbius`
+      );
       log.info(`Join our telegram https://t.me/arbius_ai`);
       process.exit(1);
     }
   }
 
   await dbQueueJob({
-    method: 'validatorStake',
+    method: "validatorStake",
     priority: 30,
     waituntil: 0,
     concurrent: false,
@@ -1269,54 +1289,54 @@ export async function main() {
 
   if (c.automine.enabled) {
     await dbQueueJob({
-      method: 'automine',
+      method: "automine",
       priority: 5,
       waituntil: 0,
       concurrent: false,
-      data: {
-      },
+      data: {},
     });
   }
 
-  arbius.on('VersionChanged', async(
-    version: ethers.BigNumber,
-    evt:     ethers.Event,
-  ) => {
-    log.debug('Event.VersionChanged', version.toString());
-    await versionCheck();
-  });
+  arbius.on(
+    "VersionChanged",
+    async (version: ethers.BigNumber, evt: ethers.Event) => {
+      log.debug("Event.VersionChanged", version.toString());
+      await versionCheck();
+    }
+  );
 
-  arbius.on('TaskSubmitted', (
-    taskid:  string,
-    modelid: string,
-    fee:     BigNumber,
-    sender:  string,
-    evt:     ethers.Event,
-  ) => eventHandlerTaskSubmitted(taskid, evt));
+  arbius.on(
+    "TaskSubmitted",
+    (
+      taskid: string,
+      modelid: string,
+      fee: BigNumber,
+      sender: string,
+      evt: ethers.Event
+    ) => eventHandlerTaskSubmitted(taskid, evt)
+  );
 
-  arbius.on('TaskRetracted', (
-    taskid:  string,
-    evt:     ethers.Event,
-  ) => eventHandlerTaskRetracted(taskid, evt));
+  arbius.on("TaskRetracted", (taskid: string, evt: ethers.Event) =>
+    eventHandlerTaskRetracted(taskid, evt)
+  );
 
-  arbius.on('SolutionSubmitted', (
-    validator: string,
-    taskid:    string,
-    evt:       ethers.Event,
-  ) => eventHandlerSolutionSubmitted(taskid, evt));
+  arbius.on(
+    "SolutionSubmitted",
+    (validator: string, taskid: string, evt: ethers.Event) =>
+      eventHandlerSolutionSubmitted(taskid, evt)
+  );
 
-  arbius.on('ContestationSubmitted', (
-    validator: string,
-    taskid:    string,
-    evt:       ethers.Event,
-  ) => eventHandlerContestationSubmitted(validator, taskid, evt));
+  arbius.on(
+    "ContestationSubmitted",
+    (validator: string, taskid: string, evt: ethers.Event) =>
+      eventHandlerContestationSubmitted(validator, taskid, evt)
+  );
 
-  arbius.on('ContestationVote', (
-    validator: string,
-    taskid:    string,
-    yea:       boolean,
-    evt:       ethers.Event,
-  ) => eventHandlerContestationVote(validator, taskid, yea, evt));
+  arbius.on(
+    "ContestationVote",
+    (validator: string, taskid: string, yea: boolean, evt: ethers.Event) =>
+      eventHandlerContestationVote(validator, taskid, yea, evt)
+  );
 
   /*
   governor.on('ProposalCreated', (
@@ -1349,7 +1369,7 @@ export async function main() {
       }
     }
 
-    if (! hasActiveJobs) {
+    if (!hasActiveJobs) {
       await sleep(100);
       continue;
     }
