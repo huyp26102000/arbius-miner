@@ -17,6 +17,13 @@ or just follow [Here](https://cloud.vast.ai/cli/)
 ```
 touch ~/.no_auto_tmux;
 ```
+```
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install --lts
+npm install -g yarn
+npm install -g pm2
+```
 ## Run
 <b>Mining</b>
 ```

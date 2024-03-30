@@ -76,7 +76,8 @@ import {
   depositForValidator,
   getValidatorStaked,
 } from './blockchain';
-
+let queueTask = []
+let currenttask:string = ""
 // type interfaces;
 interface LookupResult {
   model: string;
@@ -706,6 +707,8 @@ async function processTask(
 
   // this will be populated
   let input = await lookupAndInsertTaskInput(taskid, cid, txid, modelTemplate);
+  console.log("processTaskabdabdabad", input);
+  
 
   log.debug(`Task (${taskid}) input ${JSON.stringify(input, null, 2)}`);
   const { validator: solutionValidator2 } = await expretry(
@@ -714,15 +717,18 @@ async function processTask(
   if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
     return; // TODO some % of the time we should attempt any way
   }
-  await dbQueueJob({
-    method: 'solve',
-    priority: 20,
-    waituntil: 0,
-    concurrent: false,
-    data: {
-      taskid,
-    },
-  });
+  // if(currenttask?.length == 0) {
+    await processSolve(taskid, JSON.stringify(input))
+  // }
+  // await dbQueueJob({
+  //   method: 'solve',
+  //   priority: 20,
+  //   waituntil: 0,
+  //   concurrent: false,
+  //   data: {
+  //     taskid,
+  //   },
+  // });
 }
 const modelHardcode ={
   ...Kandinsky2Model,
@@ -756,22 +762,22 @@ const modelHardcode ={
     return [path];
   },
 } 
-async function processSolve(taskid: string) {
+async function processSolve(taskid: string, inputTask: string) {
   // TODO defer solution lookup for faster generation
-  const {
-    validator: solutionValidator,
-    blocktime: solutionBlocktime,
-    claimed: solutionClaimed,
-    cid: solutionCid
-  } = await expretry(async () => await arbius.solutions(taskid));
-  // const { owner } = await expretry(async () => await arbius.tasks(taskid));
+  // const {
+  //   validator: solutionValidator,
+  //   blocktime: solutionBlocktime,
+  //   claimed: solutionClaimed,
+  //   cid: solutionCid
+  // } = await expretry(async () => await arbius.solutions(taskid));
+  // // const { owner } = await expretry(async () => await arbius.tasks(taskid));
 
-  if (solutionValidator != "0x0000000000000000000000000000000000000000") {
-    log.debug(`Task (${taskid}) already has solution`);
-    // TODO we may want to not do this right now for checking cid for solutions? maybe?
-    return; // TODO some % of the time we should attempt any way
-  }
-
+  // if (solutionValidator != "0x0000000000000000000000000000000000000000") {
+  //   log.debug(`Task (${taskid}) already has solution`);
+  //   // TODO we may want to not do this right now for checking cid for solutions? maybe?
+  //   return; // TODO some % of the time we should attempt any way
+  // }
+  currenttask = taskid
   const lookup = await expretry(async () => await lookupAndInsertTask(taskid));
   if (!lookup) {
     throw new Error("could not look up task");
@@ -785,7 +791,12 @@ async function processSolve(taskid: string) {
   }
 
   // TODO if we have txid here we could do lookupAndInsertTaskInput
-  const taskInput = await dbGetTaskInput(taskid, inputCid);
+  const taskInput = {
+    taskid: taskid,
+    cid: inputCid,
+    data: inputTask
+  }
+  
   if (taskInput === null) {
     log.warn(`Task (${taskid}) input not found in db`);
     return;
@@ -826,8 +837,9 @@ async function processSolve(taskid: string) {
         const tx = await solver.submitSolution(taskid, cid, {
           gasLimit: 500_000,
         });
-        const receipt = await tx.wait();
-        log.info(`Solution submitted in ${receipt.transactionHash}`);
+        currenttask=""
+        // const receipt = await tx.wait();
+        // log.info(`Solution submitted in ${receipt.transactionHash}`);
         // await dbQueueJob({
         //   method: "claim",
         //   priority: 50,
@@ -839,24 +851,24 @@ async function processSolve(taskid: string) {
         // });
       } catch (e) {
         log.debug(JSON.stringify(e));
-        const {
-          validator: existingSolutionValidator,
-          blocktime: existingSolutionBlocktime,
-          claimed: existingSolutionClaimed,
-          cid: existingSolutionCid,
-        } = await expretry(async () => await arbius.solutions(taskid));
+        // const {
+        //   validator: existingSolutionValidator,
+        //   blocktime: existingSolutionBlocktime,
+        //   claimed: existingSolutionClaimed,
+        //   cid: existingSolutionCid,
+        // } = await expretry(async () => await arbius.solutions(taskid));
 
-        if (existingSolutionValidator == "0x0000000000000000000000000000000000000000") {
-          throw new Error(`An unknown error occurred when tried to submit solution for ${taskid} with cid ${cid} -- ${JSON.stringify(e)}`);
-        }
+        // if (existingSolutionValidator == "0x0000000000000000000000000000000000000000") {
+        //   throw new Error(`An unknown error occurred when tried to submit solution for ${taskid} with cid ${cid} -- ${JSON.stringify(e)}`);
+        // }
 
-        if (existingSolutionCid === cid) {
-          log.info(`Solution found for ${taskid} matches our cid ${cid}`);
-          return;
-        }
+        // if (existingSolutionCid === cid) {
+        //   log.info(`Solution found for ${taskid} matches our cid ${cid}`);
+        //   return;
+        // }
 
-        log.info(`Solution found with cid ${existingSolutionCid} does not match ours ${cid}`);
-        await contestSolution(taskid);
+        // log.info(`Solution found with cid ${existingSolutionCid} does not match ours ${cid}`);
+        // await contestSolution(taskid);
       }
     },
     3,
@@ -1131,8 +1143,8 @@ export async function processJobs(jobs: DBJob[]) {
           decoded.taskid,
           decoded.txid,
         );
-      case 'solve':
-        return () => processSolve(decoded.taskid);
+      // case 'solve':
+      //   return () => processSolve(decoded.taskid);
       case 'claim':
         return () => processClaim(decoded.taskid);
         break;

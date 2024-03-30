@@ -37,6 +37,8 @@ export async function pinFilesToIPFS(c: MiningConfig, taskid: string, paths: str
       const options = {
         ...ipfsOptions,
         wrapWithDirectory: true,
+        onlyHash: true,
+        pin: false
       };
 
       const res = ipfsClient.addAll(data, options);
