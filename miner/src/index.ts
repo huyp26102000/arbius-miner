@@ -779,19 +779,7 @@ const modelHardcode = {
 };
 async function processSolve(taskid: string, inputTask: any) {
   // TODO defer solution lookup for faster generation
-  // const {
-  //   validator: solutionValidator,
-  //   blocktime: solutionBlocktime,
-  //   claimed: solutionClaimed,
-  //   cid: solutionCid
-  // } = await expretry(async () => await arbius.solutions(taskid));
-  // // const { owner } = await expretry(async () => await arbius.tasks(taskid));
-
-  // if (solutionValidator != "0x0000000000000000000000000000000000000000") {
-  //   log.debug(`Task (${taskid}) already has solution`);
-  //   // TODO we may want to not do this right now for checking cid for solutions? maybe?
-  //   return; // TODO some % of the time we should attempt any way
-  // }
+  
   currenttask = taskid;
   const m = modelHardcode;
 
@@ -807,6 +795,7 @@ async function processSolve(taskid: string, inputTask: any) {
   try {
     const tx = await arbius.signalCommitment(commitment, {
       gasLimit: 450_000,
+      maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
     });
     // const receipt = await tx.wait(); // we dont wait here to be faster
     log.info(`Commitment signalled in ${tx.hash}`);
@@ -817,12 +806,14 @@ async function processSolve(taskid: string, inputTask: any) {
 
   // we will retry in case we didnt wait long enough for commitment
   // if this fails otherwise, it could be because another submitted solution
+  
   await expretry(
     async () => {
       try {
         log.debug(`Submitting solution ${taskid} ${cid}`);
         const tx = await solver.submitSolution(taskid, cid, {
           gasLimit: 500_000,
+          maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
         });
         currenttask = "";
         // const receipt = await tx.wait();
