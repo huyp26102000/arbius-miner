@@ -681,6 +681,7 @@ async function processAutomine() {
       ),
       {
         gasLimit: 2_500_000,
+        maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
       }
     );
 
@@ -744,6 +745,7 @@ async function processAutomine() {
       try {
         const tx = arbius.signalCommitment(commitment, {
           gasLimit: 450_000,
+          maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
         });
         // const receipt = await tx.wait(); // we dont wait here to be faster
         // log.info(`Commitment signalled in ${tx.hash}`);
@@ -760,6 +762,7 @@ async function processAutomine() {
             log.debug(`Submitting solution ${taskid} ${cid}`);
             const tx = await solver.submitSolution(taskid, cid, {
               gasLimit: 500_000,
+              maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
             });
             // const receipt = await tx.wait();
             // log.info(`Solution submitted in ${receipt.transactionHash}`);
@@ -917,6 +920,7 @@ async function processSolve(taskid: string) {
   try {
     const tx = await arbius.signalCommitment(commitment, {
       gasLimit: 450_000,
+      maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
     });
     // const receipt = await tx.wait(); // we dont wait here to be faster
     log.info(`Commitment signalled in ${tx.hash}`);
@@ -933,6 +937,7 @@ async function processSolve(taskid: string) {
         log.debug(`Submitting solution ${taskid} ${cid}`);
         const tx = await solver.submitSolution(taskid, cid, {
           gasLimit: 500_000,
+          maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
         });
         // const receipt = await tx.wait();
         // log.info(`Solution submitted in ${receipt.transactionHash}`);
