@@ -784,14 +784,30 @@ async function processSolve(taskid: string, inputTask: any) {
   const m = modelHardcode;
 
   const input = JSON.parse(inputTask.data);
-
+  const { validator: solutionValidator2 } = await expretry(
+    async () => await arbius.solutions(taskid)
+  );
+  if (solutionValidator2 != "0x0000000000000000000000000000000000000000") {
+    log.debug(`Task (${taskid}) already has solution`);
+    // TODO we may want to not do this right now for checking cid for solutions? maybe?
+    return; // TODO some % of the time we should attempt any way
+  }
   const cid = await m.getcid(c, m, taskid, input);
   if (!cid) {
     log.error(`Task (${taskid}) CID could not be generated`);
     return;
   }
   // log.info(`CID ${cid} generated`);
+  const { validator: solutionValidator3 } = await expretry(
+    async () => await arbius.solutions(taskid)
+  );
+  
   const commitment = generateCommitment(wallet.address, taskid, cid);
+  if (solutionValidator3 != "0x0000000000000000000000000000000000000000") {
+    log.debug(`Task (${taskid}) already has solution`);
+    // TODO we may want to not do this right now for checking cid for solutions? maybe?
+    return; // TODO some % of the time we should attempt any way
+  }
   try {
     const tx = await arbius.signalCommitment(commitment, {
       gasLimit: 450_000,
