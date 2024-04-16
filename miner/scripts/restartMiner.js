@@ -37,6 +37,7 @@ const restart = async () => {
         }
         pm2.disconnect();
       });
+      console.log("Restarted normal mine");
     }
     if (status?.start) {
       pm2.restart("start-automine", (restartErr) => {
@@ -45,6 +46,7 @@ const restart = async () => {
         }
         pm2.disconnect();
       });
+      console.log("Restarted automine");
     }
   } catch (error) {
     console.log(error);
@@ -53,6 +55,6 @@ const restart = async () => {
 (async () => {
   while (true) {
     await restart();
-    await delay(2000);
+    await delay(300000);
   }
 })();
