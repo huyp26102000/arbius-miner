@@ -30,6 +30,7 @@ const getPM2Status = async () => {
 const restart = async () => {
   try {
     const status = await getPM2Status();
+    console.log(status)
     if (status?.start) {
       pm2.restart("start", (restartErr) => {
         if (restartErr) {
@@ -39,7 +40,7 @@ const restart = async () => {
       });
       console.log("Restarted normal mine");
     }
-    if (status?.start) {
+    if (status?.["start-automine"]) {
       pm2.restart("start-automine", (restartErr) => {
         if (restartErr) {
           console.error("Restart error:", restartErr);
