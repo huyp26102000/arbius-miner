@@ -32,3 +32,10 @@ pm2 start build/start.js -- MiningConfig.json
 pm2 start yarn --name "claim" -- scan:unclaimed
 ```
 <b>Claiming</b>
+
+## Free up storage & Unpin IPFS
+```
+ipfs pin ls --type recursive | cut -d' ' -f1 | xargs -n1 ipfs pin rm
+du -h --max-depth=1
+rm ~/.pm2/pm2.log
+```

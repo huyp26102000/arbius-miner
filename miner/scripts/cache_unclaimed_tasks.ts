@@ -81,7 +81,7 @@ async function processAutoClaim(configPath: string) {
   
   initializeLogger(null);
 
-  await initializeBlockchain(coreAddress);
+  await initializeBlockchain();
   if (!coreAddress) {
     console.log(`No core_address in ${configPath}`);
     return;
@@ -110,8 +110,8 @@ async function processAutoClaim(configPath: string) {
         async () => await arbius.claimSolution(taskid),
         1
       );
-      const receipt = await tx.wait();
-      log.info(`Claimed ${taskid} in ${receipt.transactionHash}`);
+      // const receipt = await tx.wait();
+      log.info(`Claimed ${taskid}`);
       claimedList.push(taskid);
     } catch (error: any) {
       // @ts-ignore
