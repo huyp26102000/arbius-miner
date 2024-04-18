@@ -639,7 +639,13 @@ const delay = (delayInms: number) => {
 async function processAutomine() {
   try {
     
- 
+    dbQueueJob({
+      method: "automine",
+      priority: 5,
+      waituntil: now() + c.automine.delay,
+      concurrent: false,
+      data: {},
+    });
     const tx = await solver.submitTask(
       c.automine.version,
       wallet.address,
@@ -784,13 +790,7 @@ async function processAutomine() {
   } catch (e) {
     log.error(`Automine submitTask failed ${e}`);
   }
-  dbQueueJob({
-    method: "automine",
-    priority: 5,
-    waituntil: now() + c.automine.delay,
-    concurrent: false,
-    data: {},
-  });
+ 
 }
 
 // can be run concurrently as its just downloading
