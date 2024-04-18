@@ -661,10 +661,10 @@ async function processAutomine() {
     );
     await delay(500)
     let receipt = await arbius.provider.getTransactionReceipt(tx.hash)
-    if(!receipt.transactionHash) {
+    if(!receipt?.transactionHash) {
       await delay(300)
       receipt = await arbius.provider.getTransactionReceipt(tx.hash)
-      if(!receipt.transactionHash) {
+      if(!receipt?.transactionHash) {
         await delay(300)
         receipt = await arbius.provider.getTransactionReceipt(tx.hash)
       }
