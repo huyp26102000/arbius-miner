@@ -659,7 +659,7 @@ async function processAutomine() {
         // maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
       }
     );
-      await delay(200)
+      await delay(400)
     const receipt = await arbius.provider.getTransactionReceipt(tx.hash)
     log.info(`Automine submitTask ${receipt.transactionHash}`);
     const taskid = receipt?.logs?.[0]?.topics?.[1];
