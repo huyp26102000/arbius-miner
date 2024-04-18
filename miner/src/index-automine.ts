@@ -553,16 +553,16 @@ async function processValidatorStake() {
     `BALCHECK Validator Minimum: ${ethers.utils.formatEther(validatorMinimum)}`
   );
 
-  // schedule checking every 2 mins
-  await dbQueueJob({
-    method: "validatorStake",
-    priority: 100,
-    waituntil: now() + 120,
-    concurrent: false,
-    data: {
-      validatorMinimum,
-    },
-  });
+  // // schedule checking every 2 mins
+  // await dbQueueJob({
+  //   method: "validatorStake",
+  //   priority: 100,
+  //   waituntil: now() + 120,
+  //   concurrent: false,
+  //   data: {
+  //     validatorMinimum,
+  //   },
+  // });
 
   const minWithTopupBuffer = validatorMinimum
     .mul(100)
