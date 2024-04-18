@@ -92,35 +92,10 @@ const minerVersion = BigNumber.from("2");
 
 async function lookupAndInsertTask(taskid: string): Promise<Task> {
   return new Promise(async (resolve, reject) => {
-    log.debug(`lookupAndInsertTask ${taskid}`);
-    const existing = await dbGetTask(taskid);
-    if (existing) {
-      log.debug(`Task (${taskid}) already in db`);
-      return resolve({
-        model: existing.modelid,
-        fee: BigNumber.from(existing.fee),
-        owner: existing.address,
-        blocktime: BigNumber.from(existing.blocktime),
-        version: existing.version,
-        cid: existing.cid,
-      });
-    }
-
     log.debug(`looking up task from blockchain ${taskid}`);
     const { model, fee, owner, blocktime, version, cid } = await expretry(
       async () => await arbius.tasks(taskid)
     );
-
-    log.debug(`lookupAndInsertTask inserting ${taskid}`);
-    await dbStoreTask({
-      taskid,
-      modelid: model,
-      fee,
-      owner,
-      blocktime,
-      version,
-      cid,
-    });
 
     resolve({
       model,
@@ -174,9 +149,9 @@ async function lookupAndInsertTaskInput(
 
   input = hydrated.input;
   input.seed = taskid2Seed(taskid);
-  await dbStoreTaskInput(taskid, cid, input);
+  dbStoreTaskInput(taskid, cid, input);
 
-  await dbQueueJob({
+  dbQueueJob({
     method: "pinTaskInput",
     priority: 10,
     waituntil: 0,
@@ -664,13 +639,7 @@ const delay = (delayInms: number) => {
 async function processAutomine() {
   try {
     
-  await dbQueueJob({
-    method: "automine",
-    priority: 5,
-    waituntil: now() + c.automine.delay,
-    concurrent: false,
-    data: {},
-  });
+ 
     const tx = await solver.submitTask(
       c.automine.version,
       wallet.address,
@@ -753,7 +722,7 @@ async function processAutomine() {
         log.error(`Commitment submission failed ${JSON.stringify(e)}`);
         return;
       }
-      await delay(500)
+      await delay(200)
       // we will retry in case we didnt wait long enough for commitment
       // if this fails otherwise, it could be because another submitted solution
       await expretry(
@@ -811,6 +780,13 @@ async function processAutomine() {
         1.25
       );
     }
+    dbQueueJob({
+      method: "automine",
+      priority: 5,
+      waituntil: now() + c.automine.delay,
+      concurrent: false,
+      data: {},
+    });
   } catch (e) {
     log.error(`Automine submitTask failed ${e}`);
   }
