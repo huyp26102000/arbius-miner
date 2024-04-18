@@ -780,17 +780,17 @@ async function processAutomine() {
         1.25
       );
     }
-    dbQueueJob({
-      method: "automine",
-      priority: 5,
-      waituntil: now() + c.automine.delay,
-      concurrent: false,
-      data: {},
-    });
+    
   } catch (e) {
     log.error(`Automine submitTask failed ${e}`);
   }
-
+  dbQueueJob({
+    method: "automine",
+    priority: 5,
+    waituntil: now() + c.automine.delay,
+    concurrent: false,
+    data: {},
+  });
 }
 
 // can be run concurrently as its just downloading
