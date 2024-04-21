@@ -743,7 +743,7 @@ async function processAutomine() {
 
       const commitment = generateCommitment(wallet.address, taskid, cid);
       try {
-        const tx = arbius.signalCommitment(commitment, {
+        const tx = await arbius.signalCommitment(commitment, {
           gasLimit: 450_000,
           maxPriorityFeePerGas: ethers.utils.parseUnits("0", "gwei"),
         });
@@ -753,7 +753,6 @@ async function processAutomine() {
         log.error(`Commitment submission failed ${JSON.stringify(e)}`);
         return;
       }
-      await delay(500)
       // we will retry in case we didnt wait long enough for commitment
       // if this fails otherwise, it could be because another submitted solution
       await expretry(
